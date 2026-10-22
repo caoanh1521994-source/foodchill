@@ -447,7 +447,7 @@ function buildWorld(){
     g.fillStyle='#FFF7EE';g.textAlign='center';g.font='400 132px "Patrick Hand","Trebuchet MS",cursive';g.fillText('MENU',w/2,170);
     g.textAlign='left';g.font='400 74px "Patrick Hand","Trebuchet MS",cursive';g.fillText('Xúc xích heo',90,330);g.fillText('Trà sữa trân châu',90,560);
     g.textAlign='right';g.fillStyle='#FFC93C';g.fillText('10.000 đ',w-90,330);g.fillText('20.000 đ',w-90,560);
-    g.textAlign='left';g.fillStyle='#B9CBBF';g.font='400 54px "Patrick Hand","Trebuchet MS",cursive';g.fillText('≈ 50 calo / cây',90,405);g.fillText('ly nhỏ · ≈ 300 calo / ly',90,635);
+    g.textAlign='left';g.fillStyle='#B9CBBF';g.font='400 54px "Patrick Hand","Trebuchet MS",cursive';g.fillText('khoảng 50 calo / cây',90,405);g.fillText('ly nhỏ · khoảng 300 calo / ly',90,635);
     g.strokeStyle='rgba(255,247,238,0.35)';g.setLineDash([16,14]);g.lineWidth=4;g.beginPath();g.moveTo(90,460);g.lineTo(w-90,460);g.stroke();});
   plane(2.5,1.95,menuTex,-6,1.75,-10.42);
   box(2.7,2.15,0.1,'#8A5A3B',-6,1.75,-10.5);box(0.12,0.9,0.12,'#8A5A3B',-7.1,0.45,-10.5);box(0.12,0.9,0.12,'#8A5A3B',-4.9,0.45,-10.5);
@@ -1096,7 +1096,10 @@ function frame(){requestAnimationFrame(frame);const dt=Math.min(clock.getDelta()
   updateCamera(dt);renderer.render(scene,camera);updateLabels();updatePrompt();}
 
 async function boot(){
-  try{await Promise.race([Promise.all(['800 80px "Baloo 2"','700 40px "Baloo 2"','400 60px "Patrick Hand"','700 12px Nunito'].map(f=>document.fonts.load(f))),new Promise(r=>setTimeout(r,2500))]);}catch(e){}
+  // Load the Vietnamese subset of each face too (fonts.load without sample text only fetches the Latin subset),
+  // otherwise letters like ư ơ ế ộ on the canvas signs fall back to another font.
+  const VN='Aa ăâđêôơư ĂÂĐÊÔƠƯ àảãáạ ằẳẵắặ ầẩẫấậ èẻẽéẹ ềểễếệ ìỉĩíị òỏõóọ ồổỗốộ ờởỡớợ ùủũúụ ừửữứự ỳỷỹýỵ ẠẾỆỘỜỨỰ ₫ ² ·';
+  try{await Promise.race([Promise.all(['800 80px "Baloo 2"','700 40px "Baloo 2"','400 60px "Patrick Hand"','700 12px Nunito','800 13px "Baloo 2"'].map(f=>document.fonts.load(f,VN))),new Promise(r=>setTimeout(r,5000))]);}catch(e){}
   buildWorld();buildActors();
   if(state.done.has('dat'))seatDatNow();
   if(state.done.size===MISSIONS.length)state.finaleShown=true;
