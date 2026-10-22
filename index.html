@@ -60,6 +60,10 @@ body{margin:0;background:var(--plum);color:var(--plum);font-family:var(--body);o
 .pill{padding:6px 12px;font:800 18px/1 var(--display);display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
 .pill .star{color:var(--sun);-webkit-text-stroke:1.5px var(--plum);font-size:22px}
 .iconbtn{width:42px;height:42px;display:grid;place-items:center;font:800 20px/1 var(--display);cursor:pointer;color:var(--plum);padding:0}
+#btn-music{position:relative;font-size:22px}
+#btn-music[aria-pressed="false"]{color:var(--ink-soft)}
+#btn-music[aria-pressed="false"]::after{content:"";position:absolute;left:7px;top:18px;width:26px;height:3px;border-radius:2px;background:var(--chili);transform:rotate(-45deg)}
+@media (max-width:620px){.iconbtn{width:38px;height:38px}#btn-music[aria-pressed="false"]::after{left:5px;top:16px}}
 .iconbtn:active,.btn:active,.choice:active,.step:active{transform:translateY(2px);box-shadow:0 2px 0 var(--plum)}
 
 #prompt{left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:10px 18px;font:800 18px/1.1 var(--display);cursor:pointer;display:flex;gap:10px;align-items:center;background:var(--sun);white-space:nowrap}
@@ -224,6 +228,7 @@ label{font-weight:700}
 </div>
 <div id="hud-right" class="hud">
   <div class="pill card" title="Số sao đã nhận"><span class="star" aria-hidden="true">★</span><span id="stars">0/4</span><span class="sr">sao</span></div>
+  <button class="iconbtn card" id="btn-music" type="button" aria-label="Nhạc nền" aria-pressed="true" title="Bật / tắt nhạc nền (M)">♪</button>
   <button class="iconbtn card" id="btn-help" type="button" aria-label="Hướng dẫn">?</button>
   <button class="iconbtn card" id="btn-reset" type="button" aria-label="Chơi lại từ đầu">↺</button>
 </div>
@@ -250,6 +255,7 @@ label{font-weight:700}
       <kbd>E</kbd><span>nói chuyện với người đứng gần</span>
       <kbd>Chạm / bấm</kbd><span>vào sàn để đi tới đó, vào nhân vật để nói chuyện</span>
       <kbd>Lăn chuột</kbd><span>phóng to, thu nhỏ</span>
+      <kbd>M hoặc ♪</kbd><span>bật, tắt nhạc nền lễ hội</span>
     </div>
     <div class="row-end"><button class="btn primary" id="btn-start" type="button">Vào khu ẩm thực</button></div>
   </div>
@@ -741,7 +747,7 @@ const ui={
 dlgBody.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;if(a==='close'){closeDialog();return;}if(handlers[a])handlers[a](b);});
 dlgBody.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('input')){e.preventDefault();if(handlers.check)handlers.check();}});
 $('#dlg-close').addEventListener('click',closeDialog);
-function openDialog(id){
+function openDialog(id){Music.setDuck(true);
   state.dialog=id;state.moveTarget=null;keys.clear();
   const n=NPCS[id];$('#dlg-portrait').style.background=n.color;$('#dlg-portrait').textContent=n.name.split(' ').pop()[0];
   $('#dlg-name').textContent=n.name;$('#dlg-role').textContent=n.role;dlg.hidden=false;promptEl.hidden=true;promptFor=null;
@@ -754,7 +760,7 @@ function openDialog(id){
   else if(cur&&cur.id!==m.id){const cn=NPCS[cur.npc];say(`Chào bạn! Bạn giúp ${cn.name} trước nhé, ở ${cur.where}. Xong việc đó rồi quay lại đây, mình có chuyện nhờ bạn.`);}
   else RUN[m.id]();
 }
-function closeDialog(){const was=state.dialog;dlg.hidden=true;state.dialog=null;
+function closeDialog(){const was=state.dialog;dlg.hidden=true;state.dialog=null;Music.setDuck(false);
   if(was&&actors[was]&&actors[was].walker)actors[was].walker.wait=0.8;
   const a=actors.giang;a.c.g.rotation.y=a.home.rotY;actors.minh.c.g.rotation.y=actors.minh.home.rotY;
   if(state.pendingDat){state.pendingDat=false;startDatScript();}
@@ -985,12 +991,71 @@ function drawPlot(cv,x,y){if(!cv)return;const dpr=Math.min(window.devicePixelRat
   if(!ok){g.beginPath();g.moveTo(cx-4,cy-4);g.lineTo(cx+4,cy+4);g.moveTo(cx+4,cy-4);g.lineTo(cx-4,cy+4);g.stroke();}
   g.font='800 13px "Baloo 2", sans-serif';g.fillStyle='#2D2042';g.textAlign=cx>W-70?'right':'left';g.textBaseline='bottom';g.fillText(`(${x}; ${y})`,cx+(cx>W-70?-11:11),cy-6);}
 
+/* ---------- festive background music (Web Audio, generated live) ---------- */
+const Music=(()=>{
+  let ctx=null,master=null,delay=null,noiseBuf=null,timer=null,step=0,next=0,on=false,duck=false;
+  const BPM=132,S=60/BPM/4,mtof=m=>440*Math.pow(2,(m-69)/12);
+  // oom-pah festival groove: C – G – Am – F | C – G – F – G
+  const CH=[[48,[60,64,67]],[43,[59,62,67]],[45,[60,64,69]],[41,[60,65,69]],[48,[60,64,67]],[43,[59,62,67]],[41,[60,65,69]],[43,[59,62,67]]];
+  // melody in eighth notes: MIDI note, 0 = hold, -1 = rest
+  const MEL=[[76,0,79,0,81,79,76,0],[74,0,79,0,74,72,71,0],[72,0,76,0,81,0,79,76],[77,0,76,0,74,0,-1,-1],
+             [76,79,84,0,83,81,79,0],[81,79,76,0,74,76,79,0],[77,0,81,0,79,77,76,74],[79,0,74,0,79,0,83,0]];
+  function init(){
+    ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const comp=ctx.createDynamicsCompressor();master=ctx.createGain();master.gain.value=0;master.connect(comp);comp.connect(ctx.destination);
+    delay=ctx.createDelay(1);delay.delayTime.value=S*3;const fb=ctx.createGain();fb.gain.value=0.28;const wet=ctx.createGain();wet.gain.value=0.22;
+    delay.connect(fb);fb.connect(delay);delay.connect(wet);wet.connect(master);
+    noiseBuf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.5),ctx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  }
+  function tone(type,freq,t,dur,vol,cut,echo){const o=ctx.createOscillator(),f=ctx.createBiquadFilter(),g=ctx.createGain();
+    o.type=type;o.frequency.value=freq;f.type='lowpass';f.frequency.value=cut;
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.008);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(f);f.connect(g);g.connect(master);if(echo)g.connect(delay);o.start(t);o.stop(t+dur+0.05);}
+  function noise(t,dur,vol,type,freq){const s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();
+    s.buffer=noiseBuf;f.type=type;f.frequency.value=freq;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+dur+0.02);}
+  function kick(t){const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(45,t+0.12);
+    g.gain.setValueAtTime(0.9,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.25);o.connect(g);g.connect(master);o.start(t);o.stop(t+0.3);}
+  function play(i,t){const loop=Math.floor(i/128),bar=Math.floor(i/16)%8,s=i%16,[root,triad]=CH[bar];
+    if(s%8===0)kick(t);
+    if(s===4||s===12){noise(t,0.14,0.42,'bandpass',1800);noise(t,0.05,0.22,'highpass',4000);}
+    if(s%2===0)noise(t,0.035,s%4===2?0.16:0.08,'highpass',7500);else noise(t,0.02,0.05,'highpass',9000);
+    if(i%128===0&&i>0)noise(t,0.9,0.18,'highpass',5000);
+    if(s===0)tone('triangle',mtof(root),t,S*3.5,0.5,900);
+    if(s===8)tone('triangle',mtof(root+7),t,S*3.5,0.45,900);
+    if(s===6||s===14)tone('triangle',mtof(root+12),t,S*1.5,0.3,900);
+    if(s===4||s===10||s===12)for(const n of triad)tone('sawtooth',mtof(n),t,S*1.2,0.065,2200);
+    if(s%2===0){const row=MEL[bar],k=s/2,n=row[k];
+      if(n>0){let len=1;while(k+len<8&&row[k+len]===0)len++;const up=loop%2===1&&bar>=4?12:0;
+        tone('square',mtof(n+up),t,S*2*len*0.95,0.085,3200,true);tone('triangle',mtof(n+12),t,S*2*len*0.6,0.03,5000);}}
+  }
+  function tick(){while(next<ctx.currentTime+0.12){play(step,next);step++;next+=S;}}
+  const level=()=>duck?0.16:0.32;
+  function start(){try{if(!ctx)init();ctx.resume();}catch(e){return;}
+    if(!timer){next=ctx.currentTime+0.06;timer=setInterval(tick,25);}
+    on=true;master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setTargetAtTime(level(),ctx.currentTime,0.3);}
+  function stop(){if(!ctx)return;on=false;master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setTargetAtTime(0,ctx.currentTime,0.08);
+    setTimeout(()=>{if(!on){clearInterval(timer);timer=null;ctx.suspend();}},400);}
+  function setDuck(d){duck=d;if(on&&ctx)master.gain.setTargetAtTime(level(),ctx.currentTime,0.25);}
+  return {start,stop,setDuck,get on(){return on;}};
+})();
+const MUSIC_KEY='foodchill3d-music';
+let musicWanted=true;try{musicWanted=localStorage.getItem(MUSIC_KEY)!=='off';}catch(e){}
+const musicBtn=$('#btn-music');
+function syncMusicBtn(){musicBtn.setAttribute('aria-pressed',String(musicWanted));}
+function setMusic(want,announce){musicWanted=want;try{localStorage.setItem(MUSIC_KEY,want?'on':'off');}catch(e){}
+  syncMusicBtn();if(want&&state.started)Music.start();else Music.stop();if(announce)toast(want?'Đã bật nhạc nền':'Đã tắt nhạc nền');}
+musicBtn.addEventListener('click',()=>setMusic(!musicWanted,true));
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(Music.on)Music.stop();}else if(musicWanted&&state.started)Music.start();});
+syncMusicBtn();
+
 /* ---------- input ---------- */
 window.addEventListener('keydown',e=>{if(e.target.matches&&e.target.matches('input,textarea'))return;
   if(e.code==='Escape'&&state.dialog){closeDialog();return;}
   if(!state.started)return;
   if(state.dialog)return;
   if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)){keys.add(e.code);e.preventDefault();}
+  if(e.code==='KeyM'){setMusic(!musicWanted,true);return;}
   if(e.code==='KeyE'||e.code==='Space'){const id=nearestNPC();if(id){e.preventDefault();openDialog(id);}}});
 window.addEventListener('keyup',e=>keys.delete(e.code));
 window.addEventListener('blur',()=>keys.clear());
@@ -1006,7 +1071,7 @@ renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();state.zoom=M
 let destT=0;function showDest(p){world.dest.position.x=p[0];world.dest.position.z=p[1];destT=1;}
 window.addEventListener('resize',()=>{renderer.setSize(window.innerWidth,window.innerHeight);camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();});
 
-$('#btn-start').addEventListener('click',()=>{$('#start').hidden=true;state.started=true;renderHUD();});
+$('#btn-start').addEventListener('click',()=>{$('#start').hidden=true;state.started=true;renderHUD();if(musicWanted)Music.start();});
 $('#btn-help').addEventListener('click',()=>{$('#start').hidden=false;state.started=false;$('#btn-start').textContent='Tiếp tục';});
 function resetGame(){state.done.clear();state.gacha={spent:0,earned:0,items:{}};persist();state.finaleShown=false;state.pendingDat=false;resetDat();
   const p=player.c.g.position;p.set(0,0,10.5);player.c.g.rotation.y=Math.PI;state.moveTarget=null;state.pendingTalk=null;
