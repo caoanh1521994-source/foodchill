@@ -27,6 +27,13 @@ body{margin:0;background:var(--plum);color:var(--plum);font-family:var(--body);o
 .tag .badge{display:none;width:30px;height:30px;border-radius:50%;place-items:center;font:800 20px/1 var(--display);border:3px solid var(--plum)}
 .tag .badge.q{display:grid;background:var(--sun);color:var(--plum);animation:bob 1s ease-in-out infinite}
 .tag.villain .name{background:#7A1E14;color:#FFF7EE}
+.login{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.login .field{min-width:0}
+.login label{display:block;font:800 13px var(--body);margin-bottom:4px;color:var(--plum)}
+.login input{width:100%;box-sizing:border-box;font:800 17px var(--display);padding:8px 12px;border:2.5px solid var(--plum);border-radius:12px;background:var(--paper);color:var(--plum)}
+.login input:focus-visible{outline:3px solid var(--chili);outline-offset:2px}
+.login-err{color:#9A2F0A!important;font-weight:800!important}
+@media (max-width:620px){.login{grid-template-columns:1fr}}
 .tiles{display:flex;gap:6px;flex-wrap:wrap}
 .tile{width:40px;height:46px;display:grid;place-items:center;font:800 24px var(--display);background:var(--plum);color:var(--sun);border-radius:10px;box-shadow:0 3px 0 #1A1230}
 .tile.on{background:var(--sun);color:var(--plum);box-shadow:0 3px 0 var(--plum)}
@@ -275,6 +282,11 @@ label{font-weight:700}
     <div class="eyebrow">Kiomath · Hoạt động trải nghiệm</div>
     <h1>Food <span>&amp;</span> Chill 3D</h1>
     <p>Khu ẩm thực đang mở cửa. Đi một vòng, gặp mọi người và dùng Toán để giúp họ ăn vặt vừa ngon vừa khỏe. Hoàn thành 4 nhiệm vụ để nhận đủ 4 sao, và ghé quầy của anh Lê Hoàng để vặn máy gacha lấy quà hoặc mua thú cưng đi cùng.</p>
+    <div class="login">
+      <div class="field"><label for="pname">Họ và tên</label><input id="pname" autocomplete="name" maxlength="40" placeholder="Ví dụ: Nguyễn Minh An"></div>
+      <div class="field"><label for="pclass">Lớp</label><input id="pclass" maxlength="12" placeholder="Ví dụ: 10A1"></div>
+    </div>
+    <p class="login-err" id="login-err" hidden>Bạn nhập họ tên trước khi vào chơi nhé.</p>
     <div class="keys">
       <kbd>W A S D</kbd><span>hoặc phím mũi tên để đi lại</span>
       <kbd>E</kbd><span>nói chuyện với người đứng gần</span>
@@ -322,7 +334,7 @@ function parseVN(s){s=String(s||'').trim().replace(/\s/g,'');if(!s)return NaN;if
 /* ---------- state ---------- */
 const STORE='foodchill3d-v1';
 function loadSaved(){try{return JSON.parse(localStorage.getItem(STORE))||{};}catch(e){return {};}}
-function persist(){try{localStorage.setItem(STORE,JSON.stringify({done:[...state.done],gacha:state.gacha,shop:state.shop,boss:state.boss,secret:state.secret}));}catch(e){}}
+function persist(){try{localStorage.setItem(STORE,JSON.stringify({done:[...state.done],gacha:state.gacha,shop:state.shop,boss:state.boss,secret:state.secret}));}catch(e){}syncProgress();}
 const SAVED=loadSaved();
 const state={done:new Set(SAVED.done||[]),gacha:Object.assign({spent:0,earned:0,items:{}},SAVED.gacha||{}),
   shop:Object.assign({coins:30+30*(SAVED.done||[]).length+10*((SAVED.gacha&&SAVED.gacha.earned)||0),owned:[],active:null},SAVED.shop||{}),
@@ -1555,6 +1567,33 @@ new MutationObserver(followSystem).observe(document.documentElement,{attributes:
 $('#btn-theme').addEventListener('click',()=>{themePref=isNight()?'day':'night';try{localStorage.setItem(THEME_KEY,themePref);}catch(e){}
   applyTheme();toast(world.night?'Đêm hội Trung thu':'Ban ngày');});
 
+/* ---------- player sign-in + list of participants in Google Sheets ---------- */
+// Dán URL Ứng dụng web của Google Apps Script (xem apps-script.gs) vào giữa hai dấu nháy
+// để có danh sách người chơi trong Google Sheet. Để trống = không gửi đi đâu.
+const PLAYER_API='';
+const PKEY='foodchill3d-player';
+let me=null;try{me=JSON.parse(localStorage.getItem(PKEY));}catch(e){}
+if(me){$('#pname').value=me.name||'';$('#pclass').value=me.cls||'';}
+const givenName=n=>n.split(' ').pop();
+function signIn(){
+  const name=$('#pname').value.trim().replace(/\s+/g,' '),cls=$('#pclass').value.trim().toUpperCase();
+  if(!name){$('#login-err').hidden=false;$('#pname').focus();return false;}
+  $('#login-err').hidden=true;
+  const id=(me&&me.name===name&&me.id)||('p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
+  me={id,name,cls};try{localStorage.setItem(PKEY,JSON.stringify(me));}catch(e){}
+  if(player)player.label.querySelector('.name').textContent=givenName(name);
+  send({type:'login'});syncProgress(true);return true;}
+function send(extra){if(!PLAYER_API||!me)return;
+  fetch(PLAYER_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({id:me.id,name:me.name,cls:me.cls,t:Date.now()},extra))}).catch(()=>{});}
+let syncT=0;
+function syncProgress(now){if(!PLAYER_API||!me)return;clearTimeout(syncT);
+  syncT=setTimeout(()=>send({type:'progress',stars:state.done.size,
+    missions:MISSIONS.filter(m=>state.done.has(m.id)).map(m=>m.title).join(', '),
+    boss:state.boss==='beaten'?1:0,secret:state.secret?1:0,coins:state.shop.coins,
+    pets:state.shop.owned.map(id=>(PETS.find(p=>p.id===id)||{}).name||id).join(', '),
+    prizes:Object.keys(state.gacha.items).length}),now?50:1500);}
+['#pname','#pclass'].forEach(s=>$(s).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#btn-start').click();}}));
+
 /* ---------- input ---------- */
 window.addEventListener('keydown',e=>{if(e.target.matches&&e.target.matches('input,textarea'))return;
   if(e.code==='Escape'&&state.dialog){closeDialog();return;}
@@ -1587,7 +1626,7 @@ function renderFrame(dt){
     if(!perf.done&&state.started){perf.t+=dt;perf.n++;if(perf.t>4){perf.done=true;if(perf.t/perf.n>0.045&&!window.__keepBloom)composer=null;}}}
   else renderer.render(scene,camera);}
 
-$('#btn-start').addEventListener('click',()=>{$('#start').hidden=true;state.started=true;renderHUD();if(musicWanted)Music.start();});
+$('#btn-start').addEventListener('click',()=>{if(!signIn())return;$('#start').hidden=true;state.started=true;renderHUD();if(musicWanted)Music.start();});
 $('#btn-help').addEventListener('click',()=>{$('#start').hidden=false;state.started=false;$('#btn-start').textContent='Tiếp tục';});
 function resetGame(){state.done.clear();state.gacha={spent:0,earned:0,items:{}};state.shop={coins:30,owned:[],active:null};setActivePet(null);resetBoss();state.secret=false;removeCrown();persist();state.finaleShown=false;state.pendingDat=false;resetDat();
   const p=player.c.g.position;p.set(0,0,10.5);player.c.g.rotation.y=Math.PI;state.moveTarget=null;state.pendingTalk=null;
@@ -1624,6 +1663,7 @@ async function boot(){
   if(state.shop.active)setActivePet(state.shop.active);
   if(state.boss==='beaten')addVictoryLanterns();
   if(state.secret)giveCrown();
+  if(me&&me.name)player.label.querySelector('.name').textContent=givenName(me.name);
   if(state.done.size===MISSIONS.length)state.finaleShown=true;
   if(state.done.size){$('#btn-start').textContent='Chơi tiếp';}
   renderHUD();frame();
