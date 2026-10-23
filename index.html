@@ -1127,11 +1127,21 @@ const MACHINE_SVG=`<svg viewBox="0 0 220 290" aria-label="Máy gacha"><circle cx
 const BOSS_ADJ={};(()=>{const e=(a,b)=>{(BOSS_ADJ[a]=BOSS_ADJ[a]||[]).push(b);(BOSS_ADJ[b]=BOSS_ADJ[b]||[]).push(a);};
   for(let i=0;i<5;i++)e('A'+i,'A'+(i+1));e('S1','A0');e('S1','A1');e('S2','A2');e('S2','A3');e('K','A3');e('K','A4');e('X','A5');e('H','A0');e('N','A5');})();
 const STALL_NODES={S1:1,S2:1,K:1,X:1};
-const BOSS_LINES=['Phí bảo kê đâu?!','Nộp 50 nghìn đi!','Gian này của anh nhé!','Tối nay đóng phí chưa?'];
+const BOSS_LINES=['Phí bảo kê đâu?!','Nộp 50 nghìn đi!','Gian này của anh nhé!','Tối nay đóng phí chưa?','Rẹt rẹt! Nộp phí mau!'];
 let boss=null;
 function actorHidden(id){if(id!=='bao')return false;if(!boss)return true;if(boss.exit)return false;return !world.night||state.boss==='beaten';}
 function buildBoss(){
   const c=makeChar({shirt:'#1E1A24',pants:'#2D2042',hair:'#111111',skin:'#E9B98E',wide:true,shades:true,chain:true,ledger:true});
+  // cartoon stun baton in the right hand, pointing forward-up, with a flickering blue spark
+  const z=new THREE.Group();z.position.set(0,-0.62,0.04);z.rotation.x=1.0;z.scale.setScalar(1.6);c.armR.add(z);
+  cyl(0.04,0.04,0.2,'#151518',0,0.08,0,z,10);box(0.085,0.34,0.085,'#2D2F3A',0,0.33,0,z);
+  box(0.09,0.05,0.09,'#FFC93C',0,0.22,0,z);box(0.09,0.03,0.09,'#FFC93C',0,0.44,0,z);
+  const btn=box(0.03,0.04,0.02,'#E8413A',0,0.3,0.05,z);btn.castShadow=false;
+  [-0.026,0.026].forEach(x=>{const p=box(0.018,0.08,0.018,'#C9CDD6',x,0.54,0,z);p.castShadow=false;});
+  const spark=glow(0x6EC8FF,0.6,0.9);spark.position.set(0,0.6,0);z.add(spark);
+  const zp=new Float32Array(6*3);const zg=new THREE.BufferGeometry();zg.setAttribute('position',new THREE.BufferAttribute(zp,3));
+  const bolt=new THREE.Line(zg,new THREE.LineBasicMaterial({color:0xD8F3FF}));bolt.frustumCulled=false;z.add(bolt);
+  c.zap={spark,bolt,zp,zg};c.holdR=true;c.armR.rotation.x=-0.9;
   const w=new Walker(c,'A2',1.7,BOSS_ADJ);
   const hb=new THREE.Mesh(new THREE.CylinderGeometry(0.75,0.75,2.4,8),new THREE.MeshBasicMaterial());hb.visible=false;hb.position.y=1.2;hb.userData.npc='bao';c.g.add(hb);hitboxes.push(hb);
   const label=makeLabel(NPCS.bao.name,'villain');label.insertAdjacentHTML('afterbegin','<span class="say"></span>');
@@ -1151,7 +1161,13 @@ function updateBoss(dt,t){
   c.g.visible=!actorHidden('bao');if(!c.g.visible)return;
   boss.w.update(dt,t);
   if(boss.sayT>0){boss.sayT-=dt;if(boss.sayT<=0)boss.label.classList.remove('saying');}
+  zapFlicker(c,boss.sayT>0||state.dialog==='bao');
 }
+function zapFlicker(c,intense){const Z=c.zap;if(!Z)return;
+  const on=Math.random()<(intense?0.75:0.22);Z.spark.visible=on;Z.bolt.visible=on;if(!on)return;
+  Z.spark.material.opacity=0.5+Math.random()*0.5;const s=(intense?1.0:0.7)+Math.random()*0.4;Z.spark.scale.set(s,s,1);
+  const P=Z.zp;for(let i=0;i<6;i++){const k=i/5;P[i*3]=-0.026+0.052*k+(i&&i<5?(Math.random()-0.5)*0.05:0);P[i*3+1]=0.58+(i&&i<5?Math.random()*0.07:0);P[i*3+2]=(i&&i<5?(Math.random()-0.5)*0.04:0);}
+  Z.zg.attributes.position.needsUpdate=true;}
 function startBossExit(){const p=boss.c.g.position;const cols=[-9,-3,3,9];
   const ax=cols.reduce((a,b)=>Math.abs(b-p.x)<Math.abs(a-p.x)?b:a);
   boss.label.querySelector('.say').textContent='Anh rút đây!!';boss.label.classList.add('saying');boss.sayT=0;
@@ -1205,7 +1221,7 @@ function drawRegion(cv,x,y,cfg){if(!cv)return;const dpr=Math.min(window.devicePi
 const LAMP={A:{light:30,area:5,watt:10,price:20000},B:{light:20,area:15,watt:15,price:40000},S:130,P:45,W:80,best:140000};
 const LAMP_PLOT={X:10,Y:6,cons:[{a:3,b:2,c:13,ge:true,color:'#C2410C'},{a:1,b:3,c:9,ge:true,color:'#0F766E'},{a:2,b:3,c:16,ge:false,color:'#7A5CC0',dash:true}]};
 function BOSS(){
-  ui.set(`<p><b>Quang Bảnh:</b> "Ê nhóc! Chợ đêm này là địa bàn của anh. Gian nào muốn bán yên ổn thì nộp <b>50.000 đ phí bảo kê</b> mỗi đêm!"</p>
+  ui.set(`<p><b>Quang Bảnh</b> giơ cây chích điện kêu rẹt rẹt: "Ê nhóc! Chợ đêm này là địa bàn của anh. Gian nào muốn bán yên ổn thì nộp <b>50.000 đ phí bảo kê</b> mỗi đêm!"</p>
     <p class="note">Các cô chú bán hàng thì thầm: "Hắn chỉ dám ra oai ở chỗ tối thôi. Thắp đủ sáng cả chợ là hắn hết chỗ đứng!"</p>
     <p><b>Quang Bảnh:</b> "Hừ, thắp đèn à? Tính không khéo là nổ cầu chì, tối om, rồi vẫn phải nộp phí cho anh!"</p>
     <div class="row-end"><button class="btn" type="button" data-act="close">Để sau</button><button class="btn primary" type="button" data-act="go">Nhận thách đấu!</button></div>`);
@@ -1238,7 +1254,7 @@ function BOSS(){
       ui.set(`<p class="ok-line">Chợ đêm sáng trưng! 3 đèn ông sao + 2 đèn kéo quân = 140.000 đ.</p>
         <div class="facts"><span><b>130</b>độ sáng</span><span><b>45 m²</b>vùng chiếu</span><span><b>60 W</b>công suất</span></div>
         <p>Điểm (3; 2) là giao của hai đường 3x + 2y = 13 và x + 3y = 9. Chỉ mua một loại đèn thì đều nổ cầu chì: 9 đèn ông sao cần 90 W, 7 đèn kéo quân cần 105 W.</p>
-        <p><b>Quang Bảnh</b> lấy tay che mắt: "Sáng thế này thì ai nộp phí nữa... Thôi, anh rút!"</p>
+        <p><b>Quang Bảnh</b> lấy tay che mắt, cây chích điện xì một tiếng rồi tắt ngấm: "Sáng thế này thì ai nộp phí nữa... Thôi, anh rút!"</p>
         <p class="note">Phần thưởng: +50 xu Chill và +2 lượt quay gacha. Đèn mới đã được treo lên các gian hàng.</p>
         <div class="row-end"><button class="btn primary" type="button" data-act="close">Tiễn Quang Bảnh</button></div>`);});
     refresh();}
