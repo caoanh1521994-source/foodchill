@@ -1570,7 +1570,7 @@ $('#btn-theme').addEventListener('click',()=>{themePref=isNight()?'day':'night';
 /* ---------- player sign-in + list of participants in Google Sheets ---------- */
 // Dán URL Ứng dụng web của Google Apps Script (xem apps-script.gs) vào giữa hai dấu nháy
 // để có danh sách người chơi trong Google Sheet. Để trống = không gửi đi đâu.
-const PLAYER_API='';
+const PLAYER_API='https://script.google.com/macros/s/AKfycbwHg3Bxni02Hm8wOVrRYJE_JZgC6Uq-xk-ZpUTHkvrBrROink43I8ROS9izYyQVz1A4/exec';
 const PKEY='foodchill3d-player';
 let me=null;try{me=JSON.parse(localStorage.getItem(PKEY));}catch(e){}
 if(me){$('#pname').value=me.name||'';$('#pclass').value=me.cls||'';}
