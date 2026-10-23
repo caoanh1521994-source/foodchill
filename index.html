@@ -26,6 +26,10 @@ body{margin:0;background:var(--plum);color:var(--plum);font-family:var(--body);o
 .tag.me .name{background:var(--sun);color:var(--plum)}
 .tag .badge{display:none;width:30px;height:30px;border-radius:50%;place-items:center;font:800 20px/1 var(--display);border:3px solid var(--plum)}
 .tag .badge.q{display:grid;background:var(--sun);color:var(--plum);animation:bob 1s ease-in-out infinite}
+.tag.villain .name{background:#7A1E14;color:#FFF7EE}
+.tag .badge.boss{display:grid;background:#C2410C;color:#FFF7EE;animation:bob .8s ease-in-out infinite}
+.tag .say{display:none;font:800 13px/1.2 var(--body);background:#FFF7EE;color:#7A1E14;border:2px solid #7A1E14;border-radius:12px;padding:4px 9px;white-space:nowrap;box-shadow:0 2px 0 #7A1E14}
+.tag.saying .say{display:block}
 .tag .badge.ok{display:grid;background:var(--mint);color:var(--cream);width:24px;height:24px;font-size:15px}
 @keyframes bob{50%{transform:translateY(-6px)}}
 
@@ -307,10 +311,11 @@ function parseVN(s){s=String(s||'').trim().replace(/\s/g,'');if(!s)return NaN;if
 /* ---------- state ---------- */
 const STORE='foodchill3d-v1';
 function loadSaved(){try{return JSON.parse(localStorage.getItem(STORE))||{};}catch(e){return {};}}
-function persist(){try{localStorage.setItem(STORE,JSON.stringify({done:[...state.done],gacha:state.gacha,shop:state.shop}));}catch(e){}}
+function persist(){try{localStorage.setItem(STORE,JSON.stringify({done:[...state.done],gacha:state.gacha,shop:state.shop,boss:state.boss}));}catch(e){}}
 const SAVED=loadSaved();
 const state={done:new Set(SAVED.done||[]),gacha:Object.assign({spent:0,earned:0,items:{}},SAVED.gacha||{}),
-  shop:Object.assign({coins:30+30*(SAVED.done||[]).length+10*((SAVED.gacha&&SAVED.gacha.earned)||0),owned:[],active:null},SAVED.shop||{}),dialog:null,started:false,moveTarget:null,pendingTalk:null,stuck:0,zoom:1,finaleShown:false};
+  shop:Object.assign({coins:30+30*(SAVED.done||[]).length+10*((SAVED.gacha&&SAVED.gacha.earned)||0),owned:[],active:null},SAVED.shop||{}),
+  boss:SAVED.boss||null,dialog:null,started:false,moveTarget:null,pendingTalk:null,stuck:0,zoom:1,finaleShown:false};
 
 const NPCS={
   giang:{name:'Cô Giang',role:'Trạm sức khỏe',color:'#0F766E'},
@@ -319,6 +324,7 @@ const NPCS={
   quynh:{name:'Chị Quỳnh',role:'Thu ngân',color:'#B83B6B'},
   hoc:{name:'Anh Văn Học',role:'Khách dạo chơi',color:'#6A4FB0'},
   thuy:{name:'Chị Thùy Linh',role:'Khách dạo chơi',color:'#D9762B'},
+  bao:{name:'Quang Bảnh',role:'"Đại ca" đòi phí bảo kê',color:'#7A1E14'},
   dat:{name:'Đạt',role:'Học sinh lớp 10',color:'#2D5DA8'},
   minh:{name:'Thầy Minh',role:'Giáo viên Kiomath',color:'#5B3C8C'},
   ba:{name:'Chị Mai Anh',role:'Quầy xúc xích',color:'#E4572E'},
@@ -413,6 +419,10 @@ function makeChar(o){
   if(o.acc==='cap'){const c=mesh(new THREE.SphereGeometry(0.37,16,10,0,Math.PI*2,0,Math.PI*0.42),o.capColor||'#C2410C',0,0.06,0,head);c.rotation.x=-0.1;box(0.42,0.04,0.3,o.capColor||'#C2410C',0,0.17,0.36,head);}
   if(o.acc==='glasses'){const tm=mat('#2D2042');[-0.12,0.12].forEach(x=>{const r=new THREE.Mesh(new THREE.TorusGeometry(0.08,0.018,6,18),tm);r.position.set(x,0.02,0.33);head.add(r);});box(0.08,0.02,0.02,'#2D2042',0,0.03,0.34,head);}
   if(o.apron){box(0.5,0.62,0.06,o.apron,0,0.98,0.32,g);}
+  if(o.shades){box(0.17,0.08,0.04,'#111111',-0.1,0.03,0.345,head);box(0.17,0.08,0.04,'#111111',0.1,0.03,0.345,head);box(0.06,0.025,0.03,'#111111',0,0.05,0.35,head);}
+  if(o.chain){const ch=new THREE.Mesh(new THREE.TorusGeometry(0.21,0.028,6,22),mat('#E8B730'));ch.rotation.x=Math.PI/2+0.4;ch.position.set(0,1.3,0.1);g.add(ch);
+    const pend=sph(0.06,'#E8B730',0,1.13,0.36*(o.wide?1.12:1),g,8);pend.scale.z=0.5;}
+  if(o.ledger){const b=box(0.14,0.18,0.04,'#C2410C',0,-0.66,0.1,armL);b.rotation.x=0.3;}
   if(o.tray){armR.rotation.x=-1.25;armR.rotation.z=0.0;const tr=cyl(0.32,0.32,0.04,'#C9C2B8',0,-0.62,0.05,armR,20);tr.rotation.x=1.25;
     const cup=cyl(0.07,0.06,0.18,'#E8CBA7',0.1,-0.7,0.0,armR,10);cup.rotation.x=1.25;}
   g.traverse(m=>{if(m.isMesh){m.castShadow=true;}});
@@ -438,7 +448,7 @@ function sitChar(c,x,z,rotY){c.seated=true;c.g.position.set(x,-0.08,z);c.g.rotat
 
 /* ---------- world ---------- */
 function buildWorld(){
-  world.bulbHalos=[];world.swing=[];world.floaters=[];world.held=[];
+  world.bulbHalos=[];world.swing=[];world.floaters=[];world.held=[];world.kq=[];
   world.fest=new THREE.Group();scene.add(world.fest);
   // ground beyond the hall
   const outside=new THREE.Mesh(new THREE.PlaneGeometry(160,160),new THREE.MeshLambertMaterial({color:'#4A3B63'}));world.outside=outside;outside.rotation.x=-Math.PI/2;outside.position.y=-0.02;outside.receiveShadow=true;scene.add(outside);
@@ -684,6 +694,7 @@ function updateFestival(dt,t){
   D.sparkle.material.opacity=0.55+Math.sin(t*2.2)*0.3;
   for(const b of world.bulbHalos)b.h.material.opacity=0.3+0.28*(0.5+0.5*Math.sin(t*3+b.ph));
   for(const s of world.swing)s.o.rotation.z=Math.sin(t*1.4+s.ph)*0.12;
+  for(const k of world.kq)k.rotation.y+=dt*0.8;
   for(const f of world.floaters){const a=f.ph+f.w*t,o=f.o;
     o.position.set(f.bx+Math.cos(a)*f.r,f.by+Math.sin(t*1.3+f.ph)*f.bob,f.bz+Math.sin(a)*f.r);
     if(f.type==='star')o.rotation.y=Math.sin(t*0.7+f.ph)*0.6;
@@ -707,6 +718,8 @@ function applyTheme(){
   sun.color.setHex(L.sun);sun.intensity=L.sunI;
   if(world.outside)world.outside.material.color.set(L.outside);
   if(world.fest)world.fest.visible=night;
+  if(boss)boss.w.c.g.visible=!actorHidden('bao');
+  if(typeof renderHUD==='function'&&$('#mlist'))renderHUD();
   for(const h of world.held||[]){h.parts.forEach(o=>o.visible=night);h.c.holdR=night;h.c.armR.rotation.x=night?-2.75:0;}
   const btn=$('#btn-theme');if(btn){btn.innerHTML=night?SUN_ICON:MOON_ICON;btn.setAttribute('aria-label',night?'Chuyển sang ban ngày':'Chuyển sang đêm hội Trung thu');btn.title=btn.getAttribute('aria-label');}
 }
@@ -768,6 +781,7 @@ function buildActors(){
   placeNPC('quynh',{shirt:'#E86A92',pants:'#2D2042',hair:'#2B1B14',long:true},14.3,12,-Math.PI/2,[11.6,12]);
   addRoamer('hoc',{shirt:'#7A5CC0',pants:'#2D2042',hair:'#1E1410'},'B2',1.6);
   addRoamer('thuy',{shirt:'#F28C38',pants:'#2D3E73',hair:'#2B1B14',long:true},'C3',1.5);
+  buildBoss();
   // player
   const pc=makeChar({shirt:'#FFC93C',pants:'#2D2042',hair:'#3A2418',acc:'cap',capColor:'#C2410C'});
   pc.g.position.set(0,0,10.5);pc.g.rotation.y=Math.PI;scene.add(pc.g);
@@ -796,13 +810,13 @@ const NODES={};const ADJ={};
   e('S1','A0');e('S1','A1');e('S2','A2');e('S2','A3');e('K','A3');e('K','A4');e('H','A0');e('H','B0');e('N','A5');e('N','B5');e('X','A5');e('X','N');e('Q','C5');e('Q','C4');
 })();
 class Walker{
-  constructor(c,node,speed){this.c=c;this.node=node;this.prev=null;this.target=node;this.speed=speed;this.wait=Math.random()*2;
+  constructor(c,node,speed,adj){this.c=c;this.node=node;this.prev=null;this.target=node;this.speed=speed;this.wait=Math.random()*2;this.adj=adj||ADJ;this.onArrive=null;
     this.ox=(Math.random()-0.5)*0.6;this.oz=(Math.random()-0.5)*0.6;const [x,z]=NODES[node];c.g.position.set(x+this.ox,0,z+this.oz);scene.add(c.g);}
   update(dt,t){const c=this.c;let moving=false;
     if(this.wait>0){this.wait-=dt;}
     else{const [tx,tz]=NODES[this.target];const dx=tx+this.ox-c.g.position.x,dz=tz+this.oz-c.g.position.z,d=Math.hypot(dx,dz);
-      if(d<0.08){this.prev=this.node;this.node=this.target;const nb=ADJ[this.node].filter(n=>n!==this.prev);const pick=nb.length?nb:ADJ[this.node];
-        this.target=pick[(Math.random()*pick.length)|0];if(Math.random()<0.35)this.wait=0.8+Math.random()*2.4;}
+      if(d<0.08){this.prev=this.node;this.node=this.target;const A=this.adj;const nb=A[this.node].filter(n=>n!==this.prev);const pick=nb.length?nb:A[this.node];
+        this.target=pick[(Math.random()*pick.length)|0];if(Math.random()<0.35)this.wait=0.8+Math.random()*2.4;if(this.onArrive)this.onArrive(this.node);}
       else{const s=Math.min(d,this.speed*dt);c.g.position.x+=dx/d*s;c.g.position.z+=dz/d*s;turnTo(c.g,Math.atan2(dx,dz),dt,8);moving=true;}}
     animChar(c,dt,moving,t);}
 }
@@ -859,7 +873,7 @@ function updatePlayer(dt,t){const c=player.c,p=c.g.position;let mx=0,mz=0;
 function isNear(id){const p=player.c.g.position,a=actors[id];const q=a.c.g.position;const ap=approachOf(id);
   return Math.hypot(p.x-q.x,p.z-q.z)<=2.6||(ap&&Math.hypot(p.x-ap[0],p.z-ap[1])<=1.1);}
 function nearestNPC(){let best=null,bd=1e9;const p=player.c.g.position;
-  for(const id in actors){if(!isNear(id))continue;const q=actors[id].c.g.position;const d=Math.hypot(p.x-q.x,p.z-q.z);if(d<bd){bd=d;best=id;}}return best;}
+  for(const id in actors){if(actorHidden(id)||!isNear(id))continue;const q=actors[id].c.g.position;const d=Math.hypot(p.x-q.x,p.z-q.z);if(d<bd){bd=d;best=id;}}return best;}
 
 /* ---------- camera ---------- */
 const camLook=new THREE.Vector3(0,1,10.5);
@@ -876,7 +890,7 @@ function placeLabel(el,obj,h){const s=project(obj.position.x,obj.position.y+h,ob
   el.style.visibility='visible';el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-100%)`;return s;}
 const pointerEl=$('#pointer');
 function updateLabels(){
-  for(const id in actors){const a=actors[id];placeLabel(a.label,a.c.g,a.c.seated?2.2:2.35);}
+  for(const id in actors){const a=actors[id];if(actorHidden(id)){a.label.style.visibility='hidden';continue;}placeLabel(a.label,a.c.g,a.c.seated?2.2:2.35);}
   placeLabel(player.label,player.c.g,2.35);
   const cur=currentMission();
   if(cur&&state.started&&!state.dialog){const a=actors[cur.npc];const q=a.c.g.position;const s=project(q.x,q.y+1.5,q.z);
@@ -895,11 +909,14 @@ function renderHUD(){const cur=currentMission();
   $('#mlist').innerHTML=MISSIONS.map(m=>{const st=state.done.has(m.id)?'done':(cur&&cur.id===m.id?'current':'locked');
     return `<li class="${st}"><span class="dot" aria-hidden="true">${st==='done'?'✓':st==='current'?'!':''}</span><span>${m.title}</span><span class="sr">${st==='done'?' (đã xong)':st==='current'?' (đang làm)':' (chưa mở)'}</span></li>`;}).join('');
   $('#objective').innerHTML=cur?`Tiếp theo: gặp <strong>${NPCS[cur.npc].name}</strong> ở ${cur.where}.`:'<strong>Đã xong cả 4 nhiệm vụ!</strong> Dạo chơi tiếp hoặc bấm ↺ để chơi lại.';
+  if(world.night||state.boss==='beaten'){const won=state.boss==='beaten';
+    $('#mlist').insertAdjacentHTML('beforeend',`<li class="side ${won?'done':'current'}"><span class="dot" aria-hidden="true">${won?'✓':'!'}</span><span>Đêm hội: đánh bại Quang Bảnh</span><span class="sr">${won?' (đã xong)':' (nhiệm vụ phụ)'}</span></li>`);}
   $('#stars').textContent=`${state.done.size}/4`;
   $('#hud-left').classList.toggle('has-task',!!cur);
   for(const id in actors){const b=actors[id].label.querySelector('.badge');const m=MISSIONS.find(x=>x.npc===id);
     b.className='badge';b.textContent='';
     if(id==='hoang'){const n=spinsLeft();if(n>0){b.classList.add('gift');b.textContent=n;}continue;}
+    if(id==='bao'){if(state.boss!=='beaten'){b.classList.add('boss');b.textContent='!';}continue;}
     if(!m)continue;
     if(state.done.has(m.id)){b.classList.add('ok');b.textContent='✓';}else if(cur&&cur.id===m.id){b.classList.add('q');b.textContent='!';}}
 }
@@ -929,12 +946,14 @@ function openDialog(id){Music.setDuck(true);
   const m=MISSIONS.find(x=>x.npc===id),cur=currentMission();
   const say=t=>ui.set(`<p>${t}</p><div class="row-end"><button class="btn primary" data-act="close">Tạm biệt</button></div>`);
   if(id==='hoang')GACHA();
+  else if(id==='bao')BOSS();
   else if(!m)say(IDLE[id]);
   else if(state.done.has(m.id))say(AFTER[id]);
   else if(cur&&cur.id!==m.id){const cn=NPCS[cur.npc];say(`Chào bạn! Bạn giúp ${cn.name} trước nhé, ở ${cur.where}. Xong việc đó rồi quay lại đây, mình có chuyện nhờ bạn.`);}
   else RUN[m.id]();
 }
-function closeDialog(){const was=state.dialog;dlg.hidden=true;state.dialog=null;Music.setDuck(false);
+function closeDialog(){const was=state.dialog;dlg.hidden=true;state.dialog=null;
+  if(state.pendingBossExit){state.pendingBossExit=false;startBossExit();}Music.setDuck(false);
   if(was&&actors[was]&&actors[was].walker)actors[was].walker.wait=0.8;
   const a=actors.giang;a.c.g.rotation.y=a.home.rotY;actors.minh.c.g.rotation.y=actors.minh.home.rotY;
   if(state.pendingDat){state.pendingDat=false;startDatScript();}
@@ -1104,6 +1123,127 @@ const MACHINE_SVG=`<svg viewBox="0 0 220 290" aria-label="Máy gacha"><circle cx
   <rect x="58" y="198" width="104" height="26" rx="8" fill="#FFF7EE"/><text x="110" y="217" ${TX} font-size="18" fill="#2D2042">GACHA</text>
   <rect x="136" y="238" width="36" height="32" rx="7" fill="#2D2042"/>
   <g class="crank"><circle cx="110" cy="250" r="20" fill="#FFC93C" stroke="#2D2042" stroke-width="4"/><rect x="104" y="232" width="12" height="36" rx="6" fill="#2D2042"/></g></svg>`;
+/* ---------- Quang Bảnh: night-only "protection fee" collector, beaten by a feasible-region problem ---------- */
+const BOSS_ADJ={};(()=>{const e=(a,b)=>{(BOSS_ADJ[a]=BOSS_ADJ[a]||[]).push(b);(BOSS_ADJ[b]=BOSS_ADJ[b]||[]).push(a);};
+  for(let i=0;i<5;i++)e('A'+i,'A'+(i+1));e('S1','A0');e('S1','A1');e('S2','A2');e('S2','A3');e('K','A3');e('K','A4');e('X','A5');e('H','A0');e('N','A5');})();
+const STALL_NODES={S1:1,S2:1,K:1,X:1};
+const BOSS_LINES=['Phí bảo kê đâu?!','Nộp 50 nghìn đi!','Gian này của anh nhé!','Tối nay đóng phí chưa?'];
+let boss=null;
+function actorHidden(id){if(id!=='bao')return false;if(!boss)return true;if(boss.exit)return false;return !world.night||state.boss==='beaten';}
+function buildBoss(){
+  const c=makeChar({shirt:'#1E1A24',pants:'#2D2042',hair:'#111111',skin:'#E9B98E',wide:true,shades:true,chain:true,ledger:true});
+  const w=new Walker(c,'A2',1.7,BOSS_ADJ);
+  const hb=new THREE.Mesh(new THREE.CylinderGeometry(0.75,0.75,2.4,8),new THREE.MeshBasicMaterial());hb.visible=false;hb.position.y=1.2;hb.userData.npc='bao';c.g.add(hb);hitboxes.push(hb);
+  const label=makeLabel(NPCS.bao.name,'villain');label.insertAdjacentHTML('afterbegin','<span class="say"></span>');
+  actors.bao={id:'bao',c,approach:null,ob:{type:'circle',x:0,z:0,r:0},home:{x:0,z:0,rotY:0},label,walker:w};
+  boss={w,c,label,exit:null,sayT:0};
+  w.onArrive=(node)=>{if(!STALL_NODES[node])return;w.wait=2.8;c.g.rotation.y=Math.PI;
+    label.querySelector('.say').textContent=BOSS_LINES[(Math.random()*BOSS_LINES.length)|0];label.classList.add('saying');boss.sayT=2.8;};
+  c.g.visible=!actorHidden('bao');
+}
+function updateBoss(dt,t){
+  if(!boss)return;const c=boss.c;
+  if(boss.exit){const pt=boss.exit[0];
+    if(!pt){boss.exit=null;c.g.visible=false;boss.label.classList.remove('saying');return;}
+    const dx=pt[0]-c.g.position.x,dz=pt[1]-c.g.position.z,d=Math.hypot(dx,dz);
+    if(d<0.1)boss.exit.shift();else{const s=Math.min(d,6.5*dt);c.g.position.x+=dx/d*s;c.g.position.z+=dz/d*s;turnTo(c.g,Math.atan2(dx,dz),dt,12);}
+    animChar(c,dt,true,t);return;}
+  c.g.visible=!actorHidden('bao');if(!c.g.visible)return;
+  boss.w.update(dt,t);
+  if(boss.sayT>0){boss.sayT-=dt;if(boss.sayT<=0)boss.label.classList.remove('saying');}
+}
+function startBossExit(){const p=boss.c.g.position;const cols=[-9,-3,3,9];
+  const ax=cols.reduce((a,b)=>Math.abs(b-p.x)<Math.abs(a-p.x)?b:a);
+  boss.label.querySelector('.say').textContent='Anh rút đây!!';boss.label.classList.add('saying');boss.sayT=0;
+  boss.exit=[[ax,Math.min(p.z,-6)],[ax,18]];boss.c.g.visible=true;}
+let kqTex=null;
+function keoQuan(s){
+  if(!kqTex)kqTex=textCanvas(512,128,(c)=>{c.fillStyle='rgba(50,20,30,0.88)';
+    for(let i=0;i<4;i++){const x=i*128+12;
+      c.beginPath();c.ellipse(x+48,80,32,14,0,0,7);c.fill();c.fillRect(x+22,88,6,26);c.fillRect(x+68,88,6,26);
+      c.beginPath();c.moveTo(x+74,72);c.lineTo(x+96,50);c.lineTo(x+104,58);c.lineTo(x+84,82);c.fill();
+      c.beginPath();c.arc(x+44,46,9,0,7);c.fill();c.fillRect(x+40,54,8,20);c.fillRect(x+30,38,40,3);}});
+  const g=new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.42*s,0.42*s,0.62*s,6,1,true),new THREE.MeshBasicMaterial({color:0xFFC46B,transparent:true,opacity:0.55,side:THREE.DoubleSide,depthWrite:false})));
+  const t=kqTex.clone();t.needsUpdate=true;t.wrapS=THREE.RepeatWrapping;
+  const inner=new THREE.Mesh(new THREE.CylinderGeometry(0.3*s,0.3*s,0.4*s,18,1,true),new THREE.MeshBasicMaterial({map:t,transparent:true,side:THREE.DoubleSide,depthWrite:false}));g.add(inner);
+  [0.33,-0.33].forEach(y=>{const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.46*s,0.46*s,0.06*s,6),bmat('#C8432A'));cap.position.y=y*s;g.add(cap);});
+  const tas=new THREE.Mesh(new THREE.BoxGeometry(0.04*s,0.35*s,0.04*s),bmat('#FFC93C'));tas.position.y=-0.55*s;g.add(tas);
+  g.add(glow(0xFFB347,2.4*s,0.55));g.userData.inner=inner;return g;}
+function addVictoryLanterns(){if(world.victory||!world.fest)return;const g=new THREE.Group();world.victory=g;world.fest.add(g);
+  // 3 đèn ông sao + 2 đèn kéo quân: the winning answer, hung over the stalls
+  [['star',-10.5,2.45,-9.35],['kq',-6,3.35,-10.1],['star',-1.5,2.45,-9.35],['star',8,2.6,-10.0],['kq',16.5,2.45,-9.35]].forEach(([k,x,y,z])=>{
+    const L=k==='star'?starLantern(0.6):keoQuan(1);L.position.set(x,y,z);g.add(L);
+    const cord=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,5.6-y,4),bmat('#2D2042'));cord.position.set(x,(y+0.3+5.9)/2,z);g.add(cord);
+    world.swing.push({o:L,ph:Math.random()*6});if(k==='kq')world.kq.push(L.userData.inner);});}
+function resetBoss(){state.boss=null;
+  if(world.victory){const g=world.victory;world.fest.remove(g);world.swing=world.swing.filter(s=>s.o.parent!==g);world.kq=[];world.victory=null;}
+  if(boss){const w=boss.w;boss.exit=null;w.node=w.target='A2';w.prev=null;w.wait=1;const [x,z]=NODES.A2;boss.c.g.position.set(x+w.ox,0,z+w.oz);boss.label.classList.remove('saying');boss.c.g.visible=!actorHidden('bao');}}
+function drawRegion(cv,x,y,cfg){if(!cv)return;const dpr=Math.min(window.devicePixelRatio||1,2);const W=cv.clientWidth||300,H=cv.clientHeight||225;
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  const L=30,R=12,T=14,B=26,X1=cfg.X,Y1=cfg.Y;const px=v=>L+v/X1*(W-L-R),py=v=>H-B-v/Y1*(H-T-B);
+  g.fillStyle='#FFFDF8';g.fillRect(0,0,W,H);
+  g.strokeStyle='#EFE4D4';g.lineWidth=1;for(let i=0;i<=X1;i++){g.beginPath();g.moveTo(px(i),py(0));g.lineTo(px(i),py(Y1));g.stroke();}
+  for(let j=0;j<=Y1;j++){g.beginPath();g.moveTo(px(0),py(j));g.lineTo(px(X1),py(j));g.stroke();}
+  const okReal=(a,b)=>cfg.cons.every(k=>k.ge?k.a*a+k.b*b>=k.c-1e-9:k.a*a+k.b*b<=k.c+1e-9);
+  g.fillStyle='rgba(15,118,110,0.2)';const st=3;
+  for(let sx=L;sx<W-R;sx+=st)for(let sy=T;sy<H-B;sy+=st){const a=(sx+st/2-L)/(W-L-R)*X1,b=(H-B-(sy+st/2))/(H-T-B)*Y1;if(okReal(a,b))g.fillRect(sx,sy,st,st);}
+  g.save();g.beginPath();g.rect(px(0),py(Y1),px(X1)-px(0),py(0)-py(Y1));g.clip();
+  for(const k of cfg.cons){g.strokeStyle=k.color;g.lineWidth=2.5;g.setLineDash(k.dash?[6,5]:[]);g.beginPath();
+    if(k.b){g.moveTo(px(0),py(k.c/k.b));g.lineTo(px(X1),py((k.c-k.a*X1)/k.b));}else{g.moveTo(px(k.c/k.a),py(0));g.lineTo(px(k.c/k.a),py(Y1));}g.stroke();}
+  g.restore();g.setLineDash([]);
+  g.strokeStyle='#2D2042';g.lineWidth=1.5;g.beginPath();g.moveTo(px(0),py(Y1));g.lineTo(px(0),py(0));g.lineTo(px(X1),py(0));g.stroke();
+  g.fillStyle='#574A69';g.font='700 11px Nunito, sans-serif';g.textAlign='center';g.textBaseline='top';
+  for(let i=0;i<=X1;i+=2)g.fillText(String(i),px(i),py(0)+5);
+  g.textAlign='right';g.textBaseline='middle';for(let j=1;j<=Y1;j++)g.fillText(String(j),px(0)-6,py(j));
+  g.fillStyle='#2D2042';for(let a=0;a<=X1;a++)for(let b=0;b<=Y1;b++)if(okReal(a,b)){g.beginPath();g.arc(px(a),py(b),2.6,0,Math.PI*2);g.fill();}
+  const ok=okReal(x,y),cx=px(Math.min(x,X1)),cy=py(Math.min(y,Y1));
+  g.lineWidth=3;g.strokeStyle='#FFFDF8';g.fillStyle=ok?'#C2410C':'#FFFDF8';g.beginPath();g.arc(cx,cy,7,0,Math.PI*2);g.fill();g.stroke();
+  g.lineWidth=2.5;g.strokeStyle=ok?'#2D2042':'#9A2F0A';g.beginPath();g.arc(cx,cy,8.5,0,Math.PI*2);g.stroke();
+  if(!ok){g.beginPath();g.moveTo(cx-4,cy-4);g.lineTo(cx+4,cy+4);g.moveTo(cx+4,cy-4);g.lineTo(cx-4,cy+4);g.stroke();}
+  g.font='800 13px "Baloo 2", sans-serif';g.fillStyle='#2D2042';g.textAlign=cx>W-70?'right':'left';g.textBaseline='bottom';g.fillText(`(${x}; ${y})`,cx+(cx>W-70?-11:11),cy-6);}
+const LAMP={A:{light:30,area:5,watt:10,price:20000},B:{light:20,area:15,watt:15,price:40000},S:130,P:45,W:80,best:140000};
+const LAMP_PLOT={X:10,Y:6,cons:[{a:3,b:2,c:13,ge:true,color:'#C2410C'},{a:1,b:3,c:9,ge:true,color:'#0F766E'},{a:2,b:3,c:16,ge:false,color:'#7A5CC0',dash:true}]};
+function BOSS(){
+  ui.set(`<p><b>Quang Bảnh:</b> "Ê nhóc! Chợ đêm này là địa bàn của anh. Gian nào muốn bán yên ổn thì nộp <b>50.000 đ phí bảo kê</b> mỗi đêm!"</p>
+    <p class="note">Các cô chú bán hàng thì thầm: "Hắn chỉ dám ra oai ở chỗ tối thôi. Thắp đủ sáng cả chợ là hắn hết chỗ đứng!"</p>
+    <p><b>Quang Bảnh:</b> "Hừ, thắp đèn à? Tính không khéo là nổ cầu chì, tối om, rồi vẫn phải nộp phí cho anh!"</p>
+    <div class="row-end"><button class="btn" type="button" data-act="close">Để sau</button><button class="btn primary" type="button" data-act="go">Nhận thách đấu!</button></div>`);
+  ui.on('go',fight);
+  function fight(){let x=1,y=1;
+    ui.set(`<p>Ban tổ chức cần thắp sáng cả chợ đêm với chi phí <b>thấp nhất</b>, mà vẫn đủ:</p>
+      <div class="facts"><span><b>≥ 130</b>độ sáng</span><span><b>≥ 45 m²</b>vùng chiếu</span><span><b>≤ 80 W</b>công suất điện</span></div>
+      <div class="shop"><div class="counters">
+        <div class="counter"><span class="what">Đèn ông sao · 20.000 đ<small>sáng 30 · chiếu 5 m² · 10 W</small></span><button class="step" type="button" data-act="x-" aria-label="Bớt 1 đèn ông sao">−</button><output id="lx" aria-live="polite"></output><button class="step" type="button" data-act="x+" aria-label="Thêm 1 đèn ông sao">+</button></div>
+        <div class="counter"><span class="what">Đèn kéo quân · 40.000 đ<small>sáng 20 · chiếu 15 m² · 15 W</small></span><button class="step" type="button" data-act="y-" aria-label="Bớt 1 đèn kéo quân">−</button><output id="ly" aria-live="polite"></output><button class="step" type="button" data-act="y+" aria-label="Thêm 1 đèn kéo quân">+</button></div>
+        <div class="meters" id="meters"></div>
+        <div class="total"><span>Chi phí</span><span class="big" id="lcost"></span></div></div>
+      <div class="plotbox"><canvas id="plot" aria-label="Miền nghiệm của 3x + 2y ≥ 13, x + 3y ≥ 9 và 2x + 3y ≤ 16"></canvas>
+        <div class="legend"><span><i style="background:#C2410C"></i>3x + 2y = 13 (sáng)</span><span><i style="background:#0F766E"></i>x + 3y = 9 (chiếu)</span><span><i style="background:#7A5CC0"></i>2x + 3y = 16 (điện)</span></div></div></div>
+      <div class="row-between"><button class="link" type="button" data-act="hint">Xem gợi ý</button><button class="btn primary" type="button" data-act="light">Thắp đèn!</button></div>
+      <p class="feedback" role="status"></p>`);
+    const calc=()=>({L:LAMP.A.light*x+LAMP.B.light*y,Ar:LAMP.A.area*x+LAMP.B.area*y,Wt:LAMP.A.watt*x+LAMP.B.watt*y,cost:LAMP.A.price*x+LAMP.B.price*y});
+    function refresh(){const v=calc();ui.q('#lx').textContent=x;ui.q('#ly').textContent=y;ui.q('#lcost').textContent=money(v.cost);
+      ui.q('#meters').innerHTML=meter('Độ sáng',v.L,LAMP.S,'min',n=>fmt(n))+meter('Vùng chiếu',v.Ar,LAMP.P,'min',n=>fmt(n)+' m²')+meter('Công suất',v.Wt,LAMP.W,'max',n=>fmt(n)+' W');
+      drawRegion(ui.q('#plot'),x,y,LAMP_PLOT);}
+    ui.on('x-',()=>{x=Math.max(0,x-1);refresh();});ui.on('x+',()=>{x=Math.min(10,x+1);refresh();});
+    ui.on('y-',()=>{y=Math.max(0,y-1);refresh();});ui.on('y+',()=>{y=Math.min(6,y+1);refresh();});
+    ui.on('hint',()=>ui.fb('Gọi x là số đèn ông sao, y là số đèn kéo quân. Sáng: 30x + 20y ≥ 130 ⇔ 3x + 2y ≥ 13. Chiếu: 5x + 15y ≥ 45 ⇔ x + 3y ≥ 9. Điện: 10x + 15y ≤ 80 ⇔ 2x + 3y ≤ 16. Tìm các đỉnh của miền nghiệm rồi so chi phí T = 20 000x + 40 000y.','hint'));
+    ui.on('light',()=>{const v=calc();
+      if(v.L<LAMP.S||v.Ar<LAMP.P)return ui.fb('Chợ vẫn còn góc tối! Quang Bảnh cười khẩy: "Còn chỗ tối là còn thu phí!"');
+      if(v.Wt>LAMP.W)return ui.fb(`Tách! Cầu chì nổ vì tổng công suất ${v.Wt} W, vượt 80 W. Cả chợ tối om. Quang Bảnh: "Nộp phí đi nhóc!"`);
+      if(v.cost>LAMP.best)return ui.fb(`Chợ sáng rồi, nhưng tốn ${money(v.cost)}. Ban tổ chức muốn tiết kiệm hơn nữa, thử lại nhé!`,'hint');
+      state.boss='beaten';state.shop.coins+=50;state.gacha.earned+=2;persist();renderHUD();addVictoryLanterns();state.pendingBossExit=true;
+      toast('Đánh bại Quang Bảnh! +50 xu · +2 lượt quay');
+      ui.set(`<p class="ok-line">Chợ đêm sáng trưng! 3 đèn ông sao + 2 đèn kéo quân = 140.000 đ.</p>
+        <div class="facts"><span><b>130</b>độ sáng</span><span><b>45 m²</b>vùng chiếu</span><span><b>60 W</b>công suất</span></div>
+        <p>Điểm (3; 2) là giao của hai đường 3x + 2y = 13 và x + 3y = 9. Chỉ mua một loại đèn thì đều nổ cầu chì: 9 đèn ông sao cần 90 W, 7 đèn kéo quân cần 105 W.</p>
+        <p><b>Quang Bảnh</b> lấy tay che mắt: "Sáng thế này thì ai nộp phí nữa... Thôi, anh rút!"</p>
+        <p class="note">Phần thưởng: +50 xu Chill và +2 lượt quay gacha. Đèn mới đã được treo lên các gian hàng.</p>
+        <div class="row-end"><button class="btn primary" type="button" data-act="close">Tiễn Quang Bảnh</button></div>`);});
+    refresh();}
+}
+
 /* ---------- pets ---------- */
 const PETS=[
   {id:'vit',name:'Vịt Vàng',price:30,desc:'Lạch bạch theo bạn khắp khu ẩm thực.'},
@@ -1338,7 +1478,7 @@ const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();let downAt=null;
 renderer.domElement.addEventListener('pointerdown',e=>{downAt={x:e.clientX,y:e.clientY};});
 renderer.domElement.addEventListener('pointerup',e=>{if(!downAt||!state.started||state.dialog)return;const moved=Math.hypot(e.clientX-downAt.x,e.clientY-downAt.y);downAt=null;if(moved>10)return;
   const r=renderer.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera);
-  const hits=ray.intersectObjects(hitboxes,false);
+  const hits=ray.intersectObjects(hitboxes,false).filter(h=>!actorHidden(h.object.userData.npc));
   if(hits.length){const id=hits[0].object.userData.npc;if(isNear(id)){openDialog(id);return;}const ap=approachOf(id)||[actors[id].c.g.position.x,actors[id].c.g.position.z+1.3];state.moveTarget=ap;state.pendingTalk=id;state.stuck=0;showDest(ap);return;}
   const fh=ray.intersectObject(world.floor,false);if(fh.length){const p=fh[0].point;state.moveTarget=[p.x,p.z];state.pendingTalk=null;state.stuck=0;showDest([p.x,p.z]);}});
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();state.zoom=Math.max(0.6,Math.min(1.5,state.zoom*(e.deltaY>0?1.08:0.93)));},{passive:false});
@@ -1357,7 +1497,7 @@ function renderFrame(dt){
 
 $('#btn-start').addEventListener('click',()=>{$('#start').hidden=true;state.started=true;renderHUD();if(musicWanted)Music.start();});
 $('#btn-help').addEventListener('click',()=>{$('#start').hidden=false;state.started=false;$('#btn-start').textContent='Tiếp tục';});
-function resetGame(){state.done.clear();state.gacha={spent:0,earned:0,items:{}};state.shop={coins:30,owned:[],active:null};setActivePet(null);persist();state.finaleShown=false;state.pendingDat=false;resetDat();
+function resetGame(){state.done.clear();state.gacha={spent:0,earned:0,items:{}};state.shop={coins:30,owned:[],active:null};setActivePet(null);resetBoss();persist();state.finaleShown=false;state.pendingDat=false;resetDat();
   const p=player.c.g.position;p.set(0,0,10.5);player.c.g.rotation.y=Math.PI;state.moveTarget=null;state.pendingTalk=null;
   if(state.dialog)closeDialog();$('#finale').hidden=true;renderHUD();toast('Bắt đầu lại từ nhiệm vụ đầu tiên');}
 const resetBtn=$('#btn-reset');let resetArm=0;
@@ -1371,6 +1511,7 @@ function frame(){requestAnimationFrame(frame);const dt=Math.min(clock.getDelta()
   updatePlayer(dt,t);
   for(const id in actors){if(id==='dat')updateDat(dt,t);else if(!actors[id].walker)animChar(actors[id].c,dt,false,t);}
   for(const w of walkers)w.update(dt,t);for(const c of extras)animChar(c,dt,false,t);
+  updateBoss(dt,t);
   const cur=currentMission();
   if(cur){const ap=approachOf(cur.npc)||[0,0];world.ring.visible=true;world.ring.position.x=ap[0];world.ring.position.z=ap[1];const s=1+Math.sin(t*4)*0.08;world.ring.scale.set(s,s,s);world.ring.rotation.z=t*0.6;}
   else world.ring.visible=false;
@@ -1389,6 +1530,7 @@ async function boot(){
   buildWorld();buildActors();setupBloom();applyTheme();
   if(state.done.has('dat'))seatDatNow();
   if(state.shop.active)setActivePet(state.shop.active);
+  if(state.boss==='beaten')addVictoryLanterns();
   if(state.done.size===MISSIONS.length)state.finaleShown=true;
   if(state.done.size){$('#btn-start').textContent='Chơi tiếp';}
   renderHUD();frame();
