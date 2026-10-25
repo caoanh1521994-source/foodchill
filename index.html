@@ -67,6 +67,9 @@ body{margin:0;background:var(--plum);color:var(--plum);font-family:var(--body);o
 #mlist li.done span:nth-child(2){text-decoration:line-through;text-decoration-color:rgba(87,74,105,.5)}
 #mlist li.current{color:var(--plum)}
 #mlist li.current .dot{background:var(--sun);border-color:var(--plum);color:var(--plum)}
+#mlist li.side{border-top:2px dashed var(--line);padding-top:6px}
+#mlist li.mystery{color:var(--plum);font-style:italic}
+#mlist li.mystery .dot{background:var(--plum);border-color:var(--plum);color:var(--sun)}
 #toggle-list{display:flex;align-items:center;gap:6px}
 #toggle-list .dotq{display:none;width:20px;height:20px;border-radius:50%;background:var(--chili);color:var(--cream);font:800 13px/20px var(--display);text-align:center}
 #hud-left.collapsed{width:auto;padding:5px;gap:0}
@@ -91,7 +94,7 @@ body{margin:0;background:var(--plum);color:var(--plum);font-family:var(--body);o
 #prompt{left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:10px 18px;font:800 18px/1.1 var(--display);cursor:pointer;display:flex;gap:10px;align-items:center;background:var(--sun);white-space:nowrap}
 #prompt kbd{font:800 14px var(--display);background:var(--plum);color:var(--cream);border-radius:6px;padding:3px 7px}
 .touch #prompt kbd{display:none}
-#pointer{width:46px;height:46px;border-radius:50%;background:var(--sun);border:2.5px solid var(--plum);display:grid;place-items:center;pointer-events:none;left:0;top:0}
+#pointer{z-index:4;width:46px;height:46px;border-radius:50%;background:var(--sun);border:2.5px solid var(--plum);display:grid;place-items:center;pointer-events:none;left:0;top:0}
 #pointer svg{width:24px;height:24px}
 #toast{left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:8px 16px;font:800 16px var(--display);background:var(--mint);color:var(--cream);border-color:var(--plum);pointer-events:none;transition:opacity .3s}
 
@@ -942,11 +945,16 @@ const promptEl=$('#prompt');let promptFor=null;
 function renderHUD(){const cur=currentMission();
   $('#mlist').innerHTML=MISSIONS.map(m=>{const st=state.done.has(m.id)?'done':(cur&&cur.id===m.id?'current':'locked');
     return `<li class="${st}"><span class="dot" aria-hidden="true">${st==='done'?'✓':st==='current'?'!':''}</span><span>${m.title}</span><span class="sr">${st==='done'?' (đã xong)':st==='current'?' (đang làm)':' (chưa mở)'}</span></li>`;}).join('');
-  $('#objective').innerHTML=cur?`Tiếp theo: gặp <strong>${NPCS[cur.npc].name}</strong> ở ${cur.where}.`:'<strong>Đã xong cả 4 nhiệm vụ!</strong> Dạo chơi tiếp hoặc bấm ↺ để chơi lại.';
-  if(world.night||state.boss==='beaten'){const won=state.boss==='beaten';
-    $('#mlist').insertAdjacentHTML('beforeend',`<li class="side ${won?'done':'current'}"><span class="dot" aria-hidden="true">${won?'✓':'!'}</span><span>Đêm hội: đánh bại Quang Bảnh</span><span class="sr">${won?' (đã xong)':' (nhiệm vụ phụ)'}</span></li>`);}
+  const won=state.boss==='beaten';
+  $('#objective').innerHTML=cur?`Tiếp theo: gặp <strong>${NPCS[cur.npc].name}</strong> ở ${cur.where}.`
+    :won?'<strong>Đã xong tất cả nhiệm vụ!</strong> Dạo chơi tiếp hoặc bấm ↺ để chơi lại.'
+    :'<strong>Đã xong cả 4 nhiệm vụ!</strong> Nhưng vẫn còn một nhiệm vụ bí ẩn chưa ai giải được…';
+  // side quest is listed in both modes; by day it stays a mystery (Quang Bảnh only shows up at the night festival)
+  const sideCls=won?'done':world.night?'current':'mystery',sideDot=won?'✓':world.night?'!':'?';
+  const sideTxt=won||world.night?'Đêm hội: đánh bại Quang Bảnh':'Nhiệm vụ bí ẩn: đánh bại Quang Bảnh';
+  $('#mlist').insertAdjacentHTML('beforeend',`<li class="side ${sideCls}"><span class="dot" aria-hidden="true">${sideDot}</span><span>${sideTxt}</span><span class="sr">${won?' (đã xong)':' (nhiệm vụ phụ)'}</span></li>`);
   $('#stars').textContent=`${state.done.size}/4`;
-  $('#hud-left').classList.toggle('has-task',!!cur);
+  $('#hud-left').classList.toggle('has-task',!!cur||!won);
   for(const id in actors){const b=actors[id].label.querySelector('.badge');const m=MISSIONS.find(x=>x.npc===id);
     b.className='badge';b.textContent='';
     if(id==='hoang'){const n=spinsLeft();if(n>0){b.classList.add('gift');b.textContent=n;}continue;}
