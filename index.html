@@ -958,7 +958,7 @@ let player,walkers=[],extras=[];
 function buildActors(){
   placeNPC('giang',{shirt:'#FFFFFF',pants:'#0F766E',hair:'#1E1410',acc:'nurse',bun:true},-16.1,0.8,Math.PI/2,[-14.8,0.8]);
   placeNPC('phuong',{shirt:'#FF9C7A',pants:'#2D2042',hair:'#3A2418',long:true,apron:'#FFF7EE'},-1.5,-11.95,0,[-1.5,-9.55]);
-  placeNPC('dat',{shirt:'#FFFFFF',pants:'#2D3E73',hair:'#1E1410',wide:true,skin:'#EDC29A'},-15.6,-1.8,Math.PI/2,null);
+  placeNPC('dat',{shirt:'#FFFFFF',pants:'#2D3E73',hair:'#1E1410',wide:true,skin:'#EDC29A'},-13.2,-3.6,Math.PI/2,null);
   placeNPC('minh',{shirt:'#6D8FD6',pants:'#3A3F4F',hair:'#1E1410',acc:'glasses'},15.6,2.7,-Math.PI/2,[14.3,2.7]);
   placeNPC('ba',{shirt:'#E4572E',pants:'#3F3159',hair:'#2B1B14',long:true,acc:'cap',capColor:'#2D2042',apron:'#FFF7EE'},-10.5,-11.95,0,[-10.5,-9.55]);
   placeNPC('thao',{shirt:'#0F766E',pants:'#2D2042',hair:'#2B1B14',bun:true,apron:'#FFF7EE'},19.4,0.5,-Math.PI/2,[16.4,0.5]);
@@ -1018,8 +1018,9 @@ function giveProp(c,kind){
 }
 const DAT_SEAT={x:-1.55,z:4,rot:Math.PI/2};
 function startDatScript(){const a=actors.dat;a.ob.r=0;
-  a.script=[{p:[-8.4,-8.6]},{p:[-10.2,-9.45],wait:1.3,face:[-10.5,-12],give:'sausage'},{p:[-5.5,-9.2]},{p:[-1.9,-9.45],wait:1.3,face:[-1.5,-12],give:'tea'},{p:[-3,-6.4]},{p:[-3,1]},{p:[-3,4]},{p:[DAT_SEAT.x,DAT_SEAT.z],sit:true}];}
-const DAT_SPOT={tea:{x:-2.7,z:-9.3,path:[[-13.6,-1.8],[-12,-6],[-3.2,-6],[-2.7,-9.3]]},menu:{x:-6,z:-8.3,path:[[-4.4,-8.9],[-6,-8.3]]}};
+  a.script=[{p:[-9.6,-8.3]},{p:[-11.9,-9.35],wait:1.3,face:[-10.5,-12],give:'sausage'},{p:[-8.6,-7.6]},{p:[-4.6,-7.6]},{p:[-0.1,-9.35],wait:1.3,face:[-1.5,-12],give:'tea'},{p:[-0.6,-6.4]},{p:[-3,-6.4]},{p:[-3,1]},{p:[-3,4]},{p:[DAT_SEAT.x,DAT_SEAT.z],sit:true}];}
+/* Đạt waits a few steps away from the counters so he never stands where the player talks to an NPC */
+const DAT_SPOT={tea:{x:-4.8,z:-7.1,path:[[-12.6,-6],[-4.8,-6.2],[-4.8,-7.1]]},menu:{x:-7.8,z:-7.3,path:[[-6.3,-6.4],[-7.8,-7.3]]}};
 function walkDat(spot){const a=actors.dat,S=DAT_SPOT[spot];a.ob.r=0;a.endRot=0;a.script=S.path.map(p=>({p}));}
 function placeDat(){const a=actors.dat,c=a.c;
   if(state.done.has('dat')){seatDatNow();return;}
